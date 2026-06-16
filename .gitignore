@@ -1,0 +1,36 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Java / Maven
+backend/target/
+backend/.mvn/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# Node / pnpm
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.pnpm-store/
+pnpm-lock.yaml
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+Thumbs.db
+
+# Docker
+*.override.yml
+
+# OS
+.DS_Store
+desktop.ini

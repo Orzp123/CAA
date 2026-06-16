@@ -1,0 +1,15 @@
+spring:
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+
+logging:
+  level:
+    com.caa: DEBUG
+    org.springframework.ai: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.kafka: DEBUG
+
+server:
+  port: 8080
