@@ -1,5 +1,9 @@
 package com.caa.common;
 
+import com.caa.auth.exception.AccountDisabledException;
+import com.caa.auth.exception.AccountLockedException;
+import com.caa.auth.exception.CaptchaInvalidException;
+import com.caa.auth.exception.InvalidCredentialsException;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +51,30 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ErrorCode.VALIDATION_ERROR, details));
+    }
+
+    @ExceptionHandler(CaptchaInvalidException.class)
+    public ResponseEntity<ApiResponse<Void>> handleCaptchaInvalid(CaptchaInvalidException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ErrorCode.CAPTCHA_INVALID, ex.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidCredentials(InvalidCredentialsException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(ErrorCode.INVALID_CREDENTIALS, ex.getMessage()));
+    }
+
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountLocked(AccountLockedException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.error(ErrorCode.ACCOUNT_LOCKED, ex.getMessage()));
+    }
+
+    @ExceptionHandler(AccountDisabledException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountDisabled(AccountDisabledException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ErrorCode.ACCOUNT_DISABLED, ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

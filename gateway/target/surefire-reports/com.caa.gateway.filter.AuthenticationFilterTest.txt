@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.caa.gateway.filter.AuthenticationFilterTest
+-------------------------------------------------------------------------------
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.729 s -- in com.caa.gateway.filter.AuthenticationFilterTest

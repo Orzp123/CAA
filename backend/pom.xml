@@ -22,9 +22,13 @@
         <spring-ai.version>2.0.0</spring-ai.version>
         <temporal.version>1.25.0</temporal.version>
         <minio.version>8.5.11</minio.version>
-        <!-- TODO: verify compatibility with Spring Boot 4.1 when SCA releases official support -->
-        <spring-cloud-alibaba.version>2023.0.3.2</spring-cloud-alibaba.version>
+        <!-- Spring Cloud 2025.1.2 adds Boot 4.1.0 compatibility; SCA 2025.1.0.0 still targets
+             Spring Cloud 2025.1.0 — BOM import order override makes verifier accept Boot 4.1.0.
+             Migrate to official SCA support when issue #4339 ships. -->
+        <spring-cloud.version>2025.1.2</spring-cloud.version>
+        <spring-cloud-alibaba.version>2025.1.0.0</spring-cloud-alibaba.version>
         <springdoc.version>2.8.0</springdoc.version>
+        <kaptcha.version>2.3.2</kaptcha.version>
     </properties>
 
     <dependencyManagement>
@@ -33,6 +37,15 @@
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>
                 <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Spring Cloud BOM FIRST: 2025.1.2 declares Boot 4.1.0 compatibility,
+                 its versions override SCA's spring-cloud-* managed versions -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -73,10 +86,33 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- Spring Cloud Bootstrap (required for bootstrap.yml) -->
+        <!-- JWT resource server (nimbus-jose-jwt via Spring Security) -->
         <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-bootstrap</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
+        <!-- OAuth2 client — provides ClientRegistration for SSO/OIDC flows -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+
+        <!-- Flyway — manages auth schema migrations -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+
+        <!-- Kaptcha — graphic captcha for password login -->
+        <dependency>
+            <groupId>com.github.penggle</groupId>
+            <artifactId>kaptcha</artifactId>
+            <version>${kaptcha.version}</version>
         </dependency>
 
         <!-- Spring Kafka -->
@@ -154,6 +190,22 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-test-autoconfigure</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Spring Boot 4.x: WebMVC and JPA test slices in separate modules -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
@@ -161,6 +213,11 @@
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
