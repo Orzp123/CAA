@@ -13,9 +13,8 @@ export default function PageDesigner() {
       if (!containerRef.current) return;
       try {
         const { Editor, ShortcutKey } = await import("amis-editor");
-        const amis = await import("amis");
         const React = (await import("react")).default;
-        const ReactDOM = (await import("react-dom")).default;
+        const { createRoot } = await import("react-dom/client");
 
         const initialSchema = {
           type: "page",
@@ -31,7 +30,8 @@ export default function PageDesigner() {
 
         ShortcutKey.bindShortCut();
 
-        ReactDOM.render(
+        const root = createRoot(containerRef.current);
+        root.render(
           React.createElement(Editor, {
             theme: "dark",
             preview: false,
@@ -39,11 +39,10 @@ export default function PageDesigner() {
             onChange: (schema: unknown) => {
               console.log("Schema updated:", schema);
             },
-          }),
-          containerRef.current
+          })
         );
 
-        editor = { unmount: () => ReactDOM.unmountComponentAtNode(containerRef.current!) };
+        editor = { unmount: () => root.unmount() };
       } catch (err) {
         console.error("Failed to load Amis editor:", err);
         if (containerRef.current) {
