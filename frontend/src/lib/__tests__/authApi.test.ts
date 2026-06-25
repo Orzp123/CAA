@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import MockAdapter from "axios-mock-adapter";
-import axios from "axios";
 import {
+  authHttp,
   login,
   logout,
   getTenantConfig,
@@ -10,7 +10,7 @@ import {
   type TenantConfigResponse,
 } from "../authApi";
 
-const mock = new MockAdapter(axios);
+const mock = new MockAdapter(authHttp);
 
 beforeEach(() => mock.reset());
 afterEach(() => mock.reset());

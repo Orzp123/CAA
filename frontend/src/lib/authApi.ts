@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const authHttp = axios.create({
+export const authHttp = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
   timeout: 30000,

@@ -107,7 +107,11 @@ describe("TenantPermissionPage", () => {
   it("点击 Save 调用 updateTenantPermissions", async () => {
     vi.mocked(adminApi.permissionAdminApi.updateTenantPermissions).mockResolvedValue(undefined);
     render(<TenantPermissionPage />);
-    await waitFor(() => expect(screen.getByText("Agent 查看")).toBeInTheDocument());
+    // 等待 getTenantPermissions 完成，p-1 的 checkbox 为 checked
+    await waitFor(() => {
+      const checkboxes = screen.getAllByRole("checkbox");
+      expect(checkboxes[0]).toBeChecked();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -119,9 +123,11 @@ describe("TenantPermissionPage", () => {
     });
   });
 
-  it("非 SYSTEM_ADMIN 不渲染页面内容", () => {
+  it("非 SYSTEM_ADMIN 不渲染页面内容", async () => {
     setupAuth("SCHOOL_ADMIN");
     const { container } = render(<TenantPermissionPage />);
-    expect(container.firstChild).toBeNull();
+    await waitFor(() => {
+      expect(container.firstChild).toBeNull();
+    });
   });
 });
