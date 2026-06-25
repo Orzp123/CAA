@@ -1,0 +1,23 @@
+spring:
+  cloud:
+    nacos:
+      config:
+        enabled: false
+      discovery:
+        enabled: false
+  config:
+    import: ""
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+jwt:
+  secret: "test-secret-key-32-chars-padding!"
+
+gateway:
+  whitelist:
+    - /auth/login
+    - /auth/register
+    - /auth/sso/*/authorize
+    - /actuator/health

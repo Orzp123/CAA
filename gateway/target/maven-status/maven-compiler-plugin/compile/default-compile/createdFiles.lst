@@ -1,0 +1,5 @@
+com\caa\gateway\config\GatewayRouteConfig.class
+com\caa\gateway\config\WhitelistConfig.class
+com\caa\gateway\filter\TenantResolutionFilter.class
+com\caa\gateway\filter\AuthenticationFilter.class
+com\caa\gateway\GatewayApplication.class

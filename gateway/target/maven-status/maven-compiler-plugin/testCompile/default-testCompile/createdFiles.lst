@@ -1,0 +1,3 @@
+com\caa\gateway\filter\AuthenticationFilterTest.class
+com\caa\gateway\filter\TenantResolutionFilterTest.class
+com\caa\gateway\config\WhitelistConfigTest.class

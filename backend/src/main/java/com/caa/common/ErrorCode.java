@@ -29,7 +29,13 @@ public enum ErrorCode {
     PAGE_PATH_CONFLICT("ERR_PAGE_PATH_CONFLICT", "Page path already exists for this tenant"),
 
     // Chat
-    CHAT_AGENT_UNAVAILABLE("ERR_CHAT_AGENT", "Chat agent is unavailable");
+    CHAT_AGENT_UNAVAILABLE("ERR_CHAT_AGENT", "Chat agent is unavailable"),
+
+    // Auth
+    CAPTCHA_INVALID("ERR_CAPTCHA_INVALID", "Invalid or expired captcha code"),
+    INVALID_CREDENTIALS("ERR_INVALID_CREDENTIALS", "Invalid credentials"),
+    ACCOUNT_LOCKED("ERR_ACCOUNT_LOCKED", "Account is temporarily locked"),
+    ACCOUNT_DISABLED("ERR_ACCOUNT_DISABLED", "Account is disabled");
 
     private final String code;
     private final String message;

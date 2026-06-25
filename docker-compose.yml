@@ -220,6 +220,40 @@ services:
     networks:
       - caa-network
 
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      NACOS_SERVER_ADDR: nacos:8848
+      NACOS_USERNAME: ${NACOS_USERNAME:-nacos}
+      NACOS_PASSWORD: ${NACOS_PASSWORD:-nacos}
+      NACOS_NAMESPACE: ${NACOS_NAMESPACE:-}
+      BACKEND_SERVICE_URL: http://backend:8081
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET env var must be set}
+      SERVER_PORT: 8080
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - caa-network
+
   backend:
     build:
       context: ./backend
@@ -252,9 +286,9 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-4-5}
-      SERVER_PORT: 8080
+      SERVER_PORT: 8081
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_PORT:-8081}:8081"
     depends_on:
       mysql:
         condition: service_healthy
@@ -265,7 +299,7 @@ services:
       nacos:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/api/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
