@@ -207,6 +207,17 @@ export default function SchoolForm({ schoolId }: Props) {
     if (!isEdit && !values.code.trim()) { setError("学校代码不能为空"); return; }
     if (!values.packageId) { setError("请选择权益套餐"); return; }
 
+    for (const slot of slots) {
+      if (slot.imageUrl && !slot.imageUrl.startsWith("http://") && !slot.imageUrl.startsWith("https://")) {
+        setError("运营位图片 URL 必须以 http:// 或 https:// 开头");
+        return;
+      }
+      if (slot.linkUrl && !slot.linkUrl.startsWith("http://") && !slot.linkUrl.startsWith("https://")) {
+        setError("运营位链接 URL 必须以 http:// 或 https:// 开头");
+        return;
+      }
+    }
+
     setSaving(true);
     setError(null);
     try {

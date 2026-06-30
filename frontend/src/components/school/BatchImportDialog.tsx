@@ -146,16 +146,20 @@ export default function BatchImportDialog({ schoolId, onClose }: Props) {
                   </li>
                 )}
               </ul>
-              {result.failureCount > 0 && (
-                <a
-                  href={result.reportDownloadUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block text-sm text-indigo-600 hover:text-indigo-800 underline"
-                >
-                  下载错误报告（Excel）
-                </a>
-              )}
+              {result.failureCount > 0 && (() => {
+                const url = result.reportDownloadUrl;
+                const isSafe = url.startsWith("https://") || url.startsWith("http://");
+                return isSafe ? (
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-sm text-indigo-600 hover:text-indigo-800 underline"
+                  >
+                    下载错误报告（Excel）
+                  </a>
+                ) : null;
+              })()}
             </div>
           )}
 
