@@ -114,7 +114,7 @@ export default function AccountFormDialog({ schoolId, account, onSuccess, onClos
           loginName: values.loginName,
           name: values.name,
           accountType: values.accountType,
-          secondaryRole: (values.secondaryRole as SecondaryRole) || null,
+          secondaryRole: values.secondaryRole !== "" ? values.secondaryRole : null,
           nickname: values.nickname || null,
           email: values.email || null,
           phone: values.phone || null,
@@ -299,7 +299,7 @@ export default function AccountFormDialog({ schoolId, account, onSuccess, onClos
             <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 space-y-1">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">重置密码</p>
               <label htmlFor="dlg-reset-password" className="block text-sm text-gray-700">
-                新密码（留空使用系统默认策略）
+                新密码（留空则不重置密码）
               </label>
               <input
                 id="dlg-reset-password"
