@@ -1,0 +1,337 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  accountApi,
+  type AccountRow,
+  type AccountType,
+  type SecondaryRole,
+} from "@/lib/schoolApi";
+
+interface Props {
+  schoolId: string;
+  account: AccountRow | null; // null = 新建
+  onSuccess: () => void;
+  onClose: () => void;
+}
+
+type FormValues = {
+  loginName: string;
+  name: string;
+  accountType: AccountType;
+  secondaryRole: SecondaryRole | "";
+  nickname: string;
+  email: string;
+  phone: string;
+  password: string;
+};
+
+const EMPTY: FormValues = {
+  loginName: "",
+  name: "",
+  accountType: "STUDENT",
+  secondaryRole: "",
+  nickname: "",
+  email: "",
+  phone: "",
+  password: "",
+};
+
+/** 根据第一身份返回合法的第二身份选项 */
+function getSecondaryRoleOptions(accountType: AccountType): SecondaryRole[] {
+  if (accountType === "SCHOOL_ADMIN") return ["TEACHER", "ASSISTANT"];
+  return ["ASSISTANT"];
+}
+
+const SECONDARY_ROLE_LABELS: Record<SecondaryRole, string> = {
+  TEACHER: "教师",
+  ASSISTANT: "助教",
+};
+
+export default function AccountFormDialog({ schoolId, account, onSuccess, onClose }: Props) {
+  const isEdit = !!account;
+  const [values, setValues] = useState<FormValues>(EMPTY);
+  const [resetPassword, setResetPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (account) {
+      setValues({
+        loginName: account.loginName,
+        name: account.name,
+        accountType: account.accountType,
+        secondaryRole: account.secondaryRole ?? "",
+        nickname: account.nickname ?? "",
+        email: account.email ?? "",
+        phone: account.phone ?? "",
+        password: "",
+      });
+    } else {
+      setValues(EMPTY);
+    }
+    setResetPassword("");
+  }, [account]);
+
+  function set<K extends keyof FormValues>(key: K, val: FormValues[K]) {
+    setValues((prev) => ({ ...prev, [key]: val }));
+  }
+
+  /** 切换账户类型时，若当前第二身份在新规则下不合法则自动清空 */
+  function handleAccountTypeChange(newType: AccountType) {
+    const validOptions = getSecondaryRoleOptions(newType);
+    setValues((prev) => ({
+      ...prev,
+      accountType: newType,
+      secondaryRole:
+        prev.secondaryRole !== "" && validOptions.includes(prev.secondaryRole as SecondaryRole)
+          ? prev.secondaryRole
+          : "",
+    }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!values.name.trim()) { setError("姓名不能为空"); return; }
+    if (!isEdit && !values.loginName.trim()) { setError("登录名不能为空"); return; }
+
+    setSaving(true);
+    setError(null);
+    try {
+      if (isEdit && account) {
+        await accountApi.update(schoolId, account.id, {
+          name: values.name,
+          nickname: values.nickname || null,
+          email: values.email || null,
+          phone: values.phone || null,
+        });
+        // 若填写了重置密码则额外调用；留空传 null 使用系统默认策略
+        if (resetPassword) {
+          await accountApi.resetPassword(schoolId, account.id, resetPassword);
+        }
+      } else {
+        await accountApi.create(schoolId, {
+          loginName: values.loginName,
+          name: values.name,
+          accountType: values.accountType,
+          secondaryRole: (values.secondaryRole as SecondaryRole) || null,
+          nickname: values.nickname || null,
+          email: values.email || null,
+          phone: values.phone || null,
+          password: values.password || null,
+        });
+      }
+      onSuccess();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg ?? (isEdit ? "更新失败" : "创建失败，请检查登录名是否重复。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={isEdit ? "编辑账户" : "新建账户"}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        {/* 标题栏 */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-900">
+            {isEdit ? "编辑账户" : "新建账户"}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="关闭"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* 表单 */}
+        <form onSubmit={handleSubmit} noValidate className="px-6 py-4 space-y-4">
+          {error && (
+            <div role="alert" className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {/* 登录名：仅新建时可编辑 */}
+          <div>
+            <label htmlFor="dlg-login-name" className="block text-sm font-medium text-gray-700 mb-1">
+              登录名 {!isEdit && <span className="text-red-500">*</span>}
+            </label>
+            <input
+              id="dlg-login-name"
+              type="text"
+              value={values.loginName}
+              onChange={(e) => set("loginName", e.target.value)}
+              disabled={isEdit}
+              required={!isEdit}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400"
+            />
+          </div>
+
+          {/* 姓名 */}
+          <div>
+            <label htmlFor="dlg-name" className="block text-sm font-medium text-gray-700 mb-1">
+              姓名 <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="dlg-name"
+              type="text"
+              value={values.name}
+              onChange={(e) => set("name", e.target.value)}
+              required
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* 账户类型：仅新建 */}
+          {!isEdit && (
+            <div>
+              <label htmlFor="dlg-account-type" className="block text-sm font-medium text-gray-700 mb-1">
+                账户类型
+              </label>
+              <select
+                id="dlg-account-type"
+                value={values.accountType}
+                onChange={(e) => handleAccountTypeChange(e.target.value as AccountType)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="STUDENT">学生</option>
+                <option value="TEACHER">教师</option>
+                <option value="SCHOOL_ADMIN">管理员</option>
+              </select>
+            </div>
+          )}
+
+          {/* 第二身份：仅新建，选项随账户类型联动 */}
+          {!isEdit && (
+            <div>
+              <label htmlFor="dlg-secondary-role" className="block text-sm font-medium text-gray-700 mb-1">
+                第二身份（可选）
+              </label>
+              <select
+                id="dlg-secondary-role"
+                value={values.secondaryRole}
+                onChange={(e) => set("secondaryRole", e.target.value as SecondaryRole | "")}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="">无</option>
+                {getSecondaryRoleOptions(values.accountType).map((role) => (
+                  <option key={role} value={role}>
+                    {SECONDARY_ROLE_LABELS[role]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* 昵称 */}
+          <div>
+            <label htmlFor="dlg-nickname" className="block text-sm font-medium text-gray-700 mb-1">
+              昵称
+            </label>
+            <input
+              id="dlg-nickname"
+              type="text"
+              value={values.nickname}
+              onChange={(e) => set("nickname", e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* 邮箱 */}
+          <div>
+            <label htmlFor="dlg-email" className="block text-sm font-medium text-gray-700 mb-1">
+              邮箱
+            </label>
+            <input
+              id="dlg-email"
+              type="email"
+              value={values.email}
+              onChange={(e) => set("email", e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* 手机 */}
+          <div>
+            <label htmlFor="dlg-phone" className="block text-sm font-medium text-gray-700 mb-1">
+              手机号
+            </label>
+            <input
+              id="dlg-phone"
+              type="tel"
+              value={values.phone}
+              onChange={(e) => set("phone", e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* 密码：仅新建 */}
+          {!isEdit && (
+            <div>
+              <label htmlFor="dlg-password" className="block text-sm font-medium text-gray-700 mb-1">
+                密码（留空使用系统默认策略）
+              </label>
+              <input
+                id="dlg-password"
+                type="password"
+                value={values.password}
+                onChange={(e) => set("password", e.target.value)}
+                autoComplete="new-password"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+          )}
+
+          {/* 重置密码：仅编辑模式 */}
+          {isEdit && (
+            <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 space-y-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">重置密码</p>
+              <label htmlFor="dlg-reset-password" className="block text-sm text-gray-700">
+                新密码（留空使用系统默认策略）
+              </label>
+              <input
+                id="dlg-reset-password"
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                autoComplete="new-password"
+                placeholder="留空则不重置密码"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+          )}
+
+          {/* 操作按钮 */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {saving ? "保存中…" : isEdit ? "保存修改" : "创建账户"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2 rounded-md border border-gray-300 text-gray-600 text-sm hover:bg-gray-100 transition-colors"
+            >
+              取消
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
