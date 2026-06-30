@@ -192,7 +192,13 @@ export default function SchoolForm({ schoolId }: Props) {
 
   // 将 slots 转为含 sortOrder 的完整数组（1-based），剥离 _key
   function buildSlots(): PromotionalSlot[] {
-    return slots.map(({ _key: _k, ...s }, i) => ({ ...s, sortOrder: i + 1 }));
+    return slots.map((slot, i) => ({
+      title: slot.title,
+      imageUrl: slot.imageUrl,
+      linkUrl: slot.linkUrl,
+      position: slot.position,
+      sortOrder: i + 1,
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
