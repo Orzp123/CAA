@@ -13,6 +13,15 @@ import {
   type SlotPosition,
 } from "@/lib/schoolApi";
 
+/** 从 axios 风格错误中提取后端 message 字段 */
+function extractApiMessage(err: unknown): string | undefined {
+  if (err && typeof err === "object" && "response" in err) {
+    const r = (err as { response?: { data?: { message?: string } } }).response;
+    return r?.data?.message;
+  }
+  return undefined;
+}
+
 interface Props {
   /** 传入时为编辑模式，不传时为新建模式 */
   schoolId?: string;
@@ -48,12 +57,17 @@ const SLOT_POSITIONS: { value: SlotPosition; label: string }[] = [
   { value: "LOGIN_BANNER", label: "登录页横幅" },
 ];
 
-const EMPTY_SLOT: Omit<PromotionalSlot, "sortOrder"> = {
-  title: "",
-  imageUrl: "",
-  linkUrl: "",
-  position: "HOME_TOP_BANNER",
-};
+type SlotState = Omit<PromotionalSlot, "sortOrder"> & { _key: string };
+
+function newSlotState(): SlotState {
+  return {
+    _key: Math.random().toString(36).slice(2),
+    title: "",
+    imageUrl: "",
+    linkUrl: "",
+    position: "HOME_TOP_BANNER",
+  };
+}
 
 const MAX_SLOTS = 10;
 
@@ -64,7 +78,7 @@ export default function SchoolForm({ schoolId }: Props) {
 
   const [values, setValues] = useState<FormValues>(EMPTY);
   const [packages, setPackages] = useState<BenefitPackage[]>([]);
-  const [slots, setSlots] = useState<Omit<PromotionalSlot, "sortOrder">[]>([]);
+  const [slots, setSlots] = useState<SlotState[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -91,11 +105,12 @@ export default function SchoolForm({ schoolId }: Props) {
             systemNameZh: d.brand.systemNameZh,
             systemNameEn: d.brand.systemNameEn,
             description: d.brand.description ?? "",
-            logoUrl: "",
+            logoUrl: d.brand.logoUrl ?? "",
           });
-          // 回填运营位（去掉 sortOrder，由索引重新生成）
+          // 回填运营位（去掉 sortOrder，由索引重新生成；附加稳定 _key）
           setSlots(
             d.slots.map(({ title, imageUrl, linkUrl, position }) => ({
+              _key: Math.random().toString(36).slice(2),
               title,
               imageUrl,
               linkUrl,
@@ -158,7 +173,7 @@ export default function SchoolForm({ schoolId }: Props) {
 
   function addSlot() {
     if (slots.length >= MAX_SLOTS) return;
-    setSlots((prev) => [...prev, { ...EMPTY_SLOT }]);
+    setSlots((prev) => [...prev, newSlotState()]);
   }
 
   function removeSlot(index: number) {
@@ -175,9 +190,9 @@ export default function SchoolForm({ schoolId }: Props) {
     );
   }
 
-  // 将 slots 转为含 sortOrder 的完整数组（1-based）
+  // 将 slots 转为含 sortOrder 的完整数组（1-based），剥离 _key
   function buildSlots(): PromotionalSlot[] {
-    return slots.map((s, i) => ({ ...s, sortOrder: i + 1 }));
+    return slots.map(({ _key: _k, ...s }, i) => ({ ...s, sortOrder: i + 1 }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -220,8 +235,7 @@ export default function SchoolForm({ schoolId }: Props) {
       }
       router.push("/admin/schools");
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      const msg = extractApiMessage(err);
       setError(msg ?? (isEdit ? "更新失败，请稍后重试。" : "创建失败，请检查代码是否重复。"));
     } finally {
       setSaving(false);
@@ -321,6 +335,9 @@ export default function SchoolForm({ schoolId }: Props) {
                 <span className="text-sm text-green-600 truncate max-w-xs" title={logoFileName}>
                   ✓ {logoFileName}
                 </span>
+              )}
+              {!logoFileName && values.logoUrl && !logoUploading && (
+                <span className="text-sm text-gray-500">当前已有 Logo（点击重新上传）</span>
               )}
               {logoUploading && (
                 <span className="text-sm text-gray-400">上传中…</span>
@@ -442,7 +459,7 @@ export default function SchoolForm({ schoolId }: Props) {
         <div className="space-y-4">
           {slots.map((slot, index) => (
             <div
-              key={index}
+              key={slot._key}
               className="rounded-md border border-gray-200 bg-gray-50 p-4 space-y-3"
             >
               <div className="flex items-center justify-between">
