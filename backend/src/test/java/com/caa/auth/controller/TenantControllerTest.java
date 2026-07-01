@@ -37,6 +37,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(TenantController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@org.springframework.test.context.ActiveProfiles("test")
+@org.springframework.test.context.TestPropertySource(properties = {
+    "spring.cloud.nacos.config.enabled=false",
+    "spring.cloud.nacos.discovery.enabled=false",
+    "spring.config.import=",
+    "spring.cloud.nacos.config.import-check.enabled=false"
+})
 @Import(JacksonAutoConfiguration.class)
 class TenantControllerTest {
 
@@ -49,6 +56,7 @@ class TenantControllerTest {
     @MockitoBean PermissionService                  permissionService;
     @MockitoBean TenantSsoConfigRepository          ssoConfigRepository;
     @MockitoBean TenantSingleDeviceConfigRepository singleDeviceConfigRepository;
+    @MockitoBean com.caa.auth.service.TokenService  tokenService;
 
     private static final String TENANT_ID = "ten-uuid-001";
 

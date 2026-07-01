@@ -35,7 +35,20 @@ public enum ErrorCode {
     CAPTCHA_INVALID("ERR_CAPTCHA_INVALID", "Invalid or expired captcha code"),
     INVALID_CREDENTIALS("ERR_INVALID_CREDENTIALS", "Invalid credentials"),
     ACCOUNT_LOCKED("ERR_ACCOUNT_LOCKED", "Account is temporarily locked"),
-    ACCOUNT_DISABLED("ERR_ACCOUNT_DISABLED", "Account is disabled");
+    ACCOUNT_DISABLED("ERR_ACCOUNT_DISABLED", "Account is disabled"),
+
+    // School management
+    SCHOOL_CODE_DUPLICATE("ERR_SCHOOL_CODE_DUPLICATE", "School code already exists"),
+    PACKAGE_NOT_FOUND("ERR_PACKAGE_NOT_FOUND", "Benefit package not found"),
+    PERMISSION_NOT_FOUND("ERR_PERMISSION_NOT_FOUND", "Permission not found"),
+    SLOT_LIMIT_EXCEEDED("ERR_SLOT_LIMIT_EXCEEDED", "Promotional slot limit (10) exceeded"),
+    LOGIN_NAME_DUPLICATE("ERR_LOGIN_NAME_DUPLICATE", "Login name already exists in this tenant"),
+    SECONDARY_ROLE_INVALID("ERR_SECONDARY_ROLE_INVALID", "Secondary role is incompatible with primary account type"),
+    EMAIL_FORMAT_INVALID("ERR_EMAIL_FORMAT_INVALID", "Email format is invalid"),
+    PHONE_FORMAT_INVALID("ERR_PHONE_FORMAT_INVALID", "Phone number format is invalid"),
+    SELF_DELETE_FORBIDDEN("ERR_SELF_DELETE_FORBIDDEN", "Cannot delete your own account"),
+    FILE_TOO_LARGE("ERR_FILE_TOO_LARGE", "File exceeds maximum row limit of 1000"),
+    FILE_FORMAT_INVALID("ERR_FILE_FORMAT_INVALID", "Unsupported file format, use .xlsx or .csv");
 
     private final String code;
     private final String message;

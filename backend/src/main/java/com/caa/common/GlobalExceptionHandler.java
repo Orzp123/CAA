@@ -4,6 +4,7 @@ import com.caa.auth.exception.AccountDisabledException;
 import com.caa.auth.exception.AccountLockedException;
 import com.caa.auth.exception.CaptchaInvalidException;
 import com.caa.auth.exception.InvalidCredentialsException;
+import com.caa.school.exception.SchoolException;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,6 +76,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleAccountDisabled(AccountDisabledException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error(ErrorCode.ACCOUNT_DISABLED, ex.getMessage()));
+    }
+
+    @ExceptionHandler(SchoolException.class)
+    public ResponseEntity<ApiResponse<Void>> handleSchoolException(SchoolException ex) {
+        HttpStatus status = switch (ex.getErrorCode()) {
+            case NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            default -> HttpStatus.BAD_REQUEST;
+        };
+        return ResponseEntity.status(status)
+                .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

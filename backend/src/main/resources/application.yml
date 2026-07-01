@@ -5,7 +5,7 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   config:
     # SCA 2025.1.0.0: bootstrap.yml replaced by spring.config.import
-    import: "nacos:caa-common.yaml"
+    import: "optional:nacos:caa-common.yaml"
   cloud:
     nacos:
       server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
@@ -32,6 +32,8 @@ spring:
       maximum-pool-size: 20
       minimum-idle: 5
       connection-timeout: 30000
+      # C-1 fix: 锁定连接时区为 UTC，防止 DATETIME 时区漂移
+      connection-init-sql: "SET time_zone='+00:00'"
       connection-test-query: SELECT 1
 
   jpa:
@@ -103,7 +105,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        # H-5 fix: 仅暴露 health/info，metrics/prometheus 须认证
+        include: health,info
   endpoint:
     health:
       show-details: when-authorized
@@ -118,6 +121,17 @@ minio:
   access-key: ${MINIO_ROOT_USER:minioadmin}
   secret-key: ${MINIO_ROOT_PASSWORD:minioadmin_secret}
   bucket-name: caa-files
+
+# M-5 fix: SSO client_secret AES-GCM 加密密钥（生产环境通过环境变量注入，禁止明文提交）
+# 警告：默认值仅用于本地开发，生产环境必须设置 APP_ENCRYPTION_SECRET 环境变量
+app:
+  encryption:
+    secret: ${APP_ENCRYPTION_SECRET:dev-only-change-in-production-32c}
+  cookie:
+    secure: ${APP_COOKIE_SECURE:false}
+  account:
+    # H-4 fix: 默认密码通过环境变量注入，生产环境必须覆盖
+    default-password: ${APP_ACCOUNT_DEFAULT_PASSWORD:Caa@2026}
 
 # Doris analytics datasource
 doris:
@@ -136,9 +150,12 @@ doris:
 springdoc:
   api-docs:
     path: /v3/api-docs
+    # H-2 fix: 非 dev 环境通过 profile 覆盖禁用，默认开启供开发使用
+    enabled: true
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
+    enabled: true
   show-actuator: false
 
 logging:

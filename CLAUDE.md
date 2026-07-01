@@ -138,9 +138,9 @@ frontend/src/
 
 | 文件 | 内容 |
 |------|------|
-| `specs/001-multi-auth-tenant-rbac/plan.md` | 多租户用户认证与权限管理系统实现计划 |
-| `specs/001-multi-auth-tenant-rbac/spec.md` | 功能规格（50/50 检查项通过） |
-| `specs/001-multi-auth-tenant-rbac/data-model.md` | 数据模型（9 张表 + Redis 缓存设计） |
-| `specs/001-multi-auth-tenant-rbac/contracts/api-contracts.md` | API 契约（认证/租户/权限接口） |
-| `specs/001-multi-auth-tenant-rbac/research.md` | 技术决策（网关/JWT/微信/SSO/黑名单） |
+| `specs/002-school-tenant-mgmt/spec.md` | 学校租户管理与账户管理规格（已评审补充） |
+| `specs/002-school-tenant-mgmt/plan.md` | 技术实现计划（4 阶段：DB→后端→前端→质量门禁） |
+| `specs/002-school-tenant-mgmt/data-model.md` | 数据模型与 V2 Migration SQL |
+| `specs/002-school-tenant-mgmt/contracts/api.md` | REST API 契约（18 个端点） |
+| `specs/002-school-tenant-mgmt/research.md` | 技术决策记录（8 条） |
 <!-- SPECKIT END -->

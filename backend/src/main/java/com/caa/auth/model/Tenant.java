@@ -33,6 +33,18 @@ public class Tenant {
     @Column(length = 256)
     private String domain;
 
+    @Column(name = "logo_url", length = 512)
+    private String logoUrl;
+
+    @Column(name = "system_name_zh", length = 128)
+    private String systemNameZh;
+
+    @Column(name = "system_name_en", length = 128)
+    private String systemNameEn;
+
+    @Column(length = 1024)
+    private String description;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "default_login_type", nullable = false, length = 16)
     private LoginType defaultLoginType = LoginType.PASSWORD;
@@ -67,6 +79,14 @@ public class Tenant {
     public void setStatus(TenantStatus status) { this.status = status; }
     public String getDomain() { return domain; }
     public void setDomain(String domain) { this.domain = domain; }
+    public String getLogoUrl() { return logoUrl; }
+    public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
+    public String getSystemNameZh() { return systemNameZh; }
+    public void setSystemNameZh(String systemNameZh) { this.systemNameZh = systemNameZh; }
+    public String getSystemNameEn() { return systemNameEn; }
+    public void setSystemNameEn(String systemNameEn) { this.systemNameEn = systemNameEn; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
     public LoginType getDefaultLoginType() { return defaultLoginType; }
     public void setDefaultLoginType(LoginType defaultLoginType) { this.defaultLoginType = defaultLoginType; }
     public LocalDateTime getCreatedAt() { return createdAt; }

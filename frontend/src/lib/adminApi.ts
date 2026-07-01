@@ -1,43 +1,8 @@
-import axios from "axios";
+import { createAuthenticatedClient } from "./httpClient";
 
 // ── Authenticated admin HTTP client ──────────────────────────────────────────
-// Reads token from the same "caa_token" JSON blob that useAuth writes.
 
-const TOKEN_KEY = "caa_token";
-
-function getBearerToken(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(TOKEN_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { token?: string };
-    return parsed.token ?? null;
-  } catch {
-    return null;
-  }
-}
-
-const adminHttp = axios.create({
-  baseURL: "/api",
-  headers: { "Content-Type": "application/json" },
-  timeout: 30000,
-});
-
-adminHttp.interceptors.request.use((config) => {
-  const token = getBearerToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-adminHttp.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401 && typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
-    return Promise.reject(err);
-  }
-);
+const adminHttp = createAuthenticatedClient();
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

@@ -110,6 +110,28 @@ public class MinioStorageService {
     }
 
     /**
+     * 生成 PUT 预签名 URL，用于客户端直传（如 Logo 上传）。
+     *
+     * @param objectName    对象路径（如 "schools/{id}/logo.jpg"）
+     * @param expirySeconds 有效期（秒）
+     * @return PUT 预签名 URL
+     */
+    public String getPresignedPutUrl(String objectName, int expirySeconds) {
+        try {
+            return minioClient.getPresignedObjectUrl(
+                    GetPresignedObjectUrlArgs.builder()
+                            .method(Method.PUT)
+                            .bucket(defaultBucket)
+                            .object(objectName)
+                            .expiry(expirySeconds, TimeUnit.SECONDS)
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate presigned PUT URL for: " + objectName, e);
+        }
+    }
+
+    /**
      * Delete an object.
      */
     public void delete(String objectName) {

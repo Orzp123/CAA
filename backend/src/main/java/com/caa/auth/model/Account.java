@@ -13,6 +13,7 @@ public class Account {
 
     public enum AccountType { SYSTEM_ADMIN, SCHOOL_ADMIN, TEACHER, STUDENT }
     public enum AccountStatus { ACTIVE, DISABLED, LOCKED }
+    public enum SecondaryRole { TEACHER, ASSISTANT }
 
     @Id
     @Column(length = 36)
@@ -29,6 +30,16 @@ public class Account {
 
     @Column(length = 128)
     private String nickname;
+
+    @Column(length = 256)
+    private String email;
+
+    @Column(length = 32)
+    private String phone;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "secondary_role", length = 16)
+    private SecondaryRole secondaryRole;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "account_type", nullable = false, length = 16)
@@ -84,6 +95,12 @@ public class Account {
     public void setName(String name) { this.name = name; }
     public String getNickname() { return nickname; }
     public void setNickname(String nickname) { this.nickname = nickname; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public SecondaryRole getSecondaryRole() { return secondaryRole; }
+    public void setSecondaryRole(SecondaryRole secondaryRole) { this.secondaryRole = secondaryRole; }
     public AccountType getAccountType() { return accountType; }
     public void setAccountType(AccountType accountType) { this.accountType = accountType; }
     public AccountStatus getStatus() { return status; }

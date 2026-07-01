@@ -1,10 +1,7 @@
-import axios from "axios";
+import { createAuthenticatedClient } from "./httpClient";
 
-export const authHttp = axios.create({
-  baseURL: "/api",
-  headers: { "Content-Type": "application/json" },
-  timeout: 30000,
-});
+// authHttp 导出供测试文件（axios-mock-adapter）使用
+export const authHttp = createAuthenticatedClient();
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -17,7 +14,7 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  token: string;
+  token: string | null;
   expiresAt: string;
   accountId: string;
   nickname: string;
@@ -39,7 +36,7 @@ export interface WechatCallbackResponse {
   tempToken?: string;
   wechatNickname?: string;
   // Present when an existing account is linked — mirrors LoginResponse
-  token?: string;
+  token?: string | null;
   expiresAt?: string;
   accountId?: string;
   nickname?: string;
@@ -63,10 +60,10 @@ export interface CompleteProfileRequest {
  * The caller is responsible for calling URL.revokeObjectURL() when done.
  */
 export async function getCaptcha(uuid: string): Promise<string> {
-  const response = await authHttp.get(`/auth/captcha/${uuid}`, {
+  const response = await authHttp.get<Blob>(`/auth/captcha/${uuid}`, {
     responseType: "blob",
   });
-  return URL.createObjectURL(response.data as Blob);
+  return URL.createObjectURL(response.data);
 }
 
 export async function login(req: LoginRequest): Promise<LoginResponse> {
@@ -74,12 +71,8 @@ export async function login(req: LoginRequest): Promise<LoginResponse> {
   return response.data;
 }
 
-export async function logout(token: string): Promise<void> {
-  await authHttp.post(
-    "/auth/logout",
-    {},
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+export async function logout(): Promise<void> {
+  await authHttp.post("/auth/logout", {});
 }
 
 export async function getTenantConfig(params: {

@@ -14,10 +14,15 @@ import com.caa.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import java.time.Duration;
+import java.time.Instant;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +44,10 @@ public class AuthController {
     private final TenantService      tenantService;
     private final WechatOAuth2Service wechatOAuth2Service;
 
+    /** HTTPS 部署时设为 true；本地开发默认 false。通过 app.cookie.secure 配置。 */
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
+
     public AuthController(AuthService authService,
                           CaptchaService captchaService,
                           TenantService tenantService,
@@ -59,14 +68,31 @@ public class AuthController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "423", description = "Account locked")
     })
     @PostMapping("/login")
-    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                            HttpServletResponse httpResponse) {
         LoginResponse response = authService.loginWithPassword(
                 request.schoolCode(),
                 request.studentNo(),
                 request.password(),
                 request.captchaUuid(),
                 request.captchaCode());
-        return ApiResponse.ok(response);
+
+        if (response.token() != null && response.expiresAt() != null) {
+            long maxAge = Duration.between(Instant.now(), response.expiresAt()).getSeconds();
+            // Fix-6: maxAge <= 0 表示 token 已过期，不应颁发 cookie
+            if (maxAge > 0) {
+                ResponseCookie cookie = ResponseCookie.from("caa_token", response.token())
+                        .httpOnly(true)
+                        .secure(cookieSecure)
+                        .sameSite("Lax")
+                        .path("/api")
+                        .maxAge(maxAge)
+                        .build();
+                httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+            }
+        }
+
+        return ApiResponse.ok(response.withoutToken());
     }
 
     // ── Captcha ──────────────────────────────────────────────────────────────
@@ -199,10 +225,29 @@ public class AuthController {
     })
     @PostMapping("/logout")
     public ApiResponse<Void> logout(
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            authService.logout(authHeader.substring(7));
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader,
+            @CookieValue(value = "caa_token", required = false) String cookieToken,
+            HttpServletResponse httpResponse) {
+
+        // cookie 优先，降级到 Bearer header
+        String token = cookieToken;
+        if (token == null && authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
         }
+        if (token != null) {
+            authService.logout(token);
+        }
+
+        // 清除 cookie
+        ResponseCookie clear = ResponseCookie.from("caa_token", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/api")
+                .maxAge(0)
+                .build();
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, clear.toString());
+
         return ApiResponse.ok();
     }
 

@@ -12,7 +12,7 @@ export default function PageDesigner() {
     async function initEditor() {
       if (!containerRef.current) return;
       try {
-        const { Editor, ShortcutKey } = await import("amis-editor");
+        const { Editor } = await import("amis-editor");
         const React = (await import("react")).default;
         const { createRoot } = await import("react-dom/client");
 
@@ -28,14 +28,14 @@ export default function PageDesigner() {
           ],
         };
 
-        ShortcutKey.bindShortCut();
-
         const root = createRoot(containerRef.current);
         root.render(
           React.createElement(Editor, {
             theme: "dark",
             preview: false,
-            value: initialSchema,
+            // amis-editor SchemaObject is a complex union; cast through unknown for schema literal
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            value: initialSchema as unknown as any,
             onChange: (schema: unknown) => {
               console.log("Schema updated:", schema);
             },
@@ -56,5 +56,5 @@ export default function PageDesigner() {
     return () => editor?.unmount?.();
   }, []);
 
-  return <div ref={containerRef} className="flex-1 overflow-hidden" style={{ height: "calc(100vh - 100px)" }} />;
+  return <div ref={containerRef} className="flex-1 overflow-hidden h-[calc(100vh-100px)]" />;
 }

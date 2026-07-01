@@ -184,8 +184,9 @@ class LoginFlowIntegrationTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) body.get("data");
         assertThat(data).isNotNull();
-        assertThat(data.get("token")).isNotNull().isInstanceOf(String.class);
-        assertThat((String) data.get("token")).isNotBlank();
+        // C-1 fix: JWT is now in httpOnly cookie, not response body
+        String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+        assertThat(setCookie).isNotBlank().contains("caa_token=");
         assertThat(data.get("accountType")).isEqualTo("STUDENT");
         assertThat(data.get("tenantId")).isEqualTo(tenantId);
     }
@@ -203,7 +204,7 @@ class LoginFlowIntegrationTest {
                 req,
                 Map.class);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     // ── Test 3: Account lockout after 5 failures ─────────────────────────────
@@ -229,7 +230,7 @@ class LoginFlowIntegrationTest {
                 correctPw,
                 Map.class);
 
-        assertThat(lockedResp.getStatusCode()).isEqualTo(HttpStatus.LOCKED);
+        assertThat(lockedResp.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     }
 
     // ── Test 4: Logout blacklists token ──────────────────────────────────────
@@ -247,7 +248,10 @@ class LoginFlowIntegrationTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) loginResp.getBody().get("data");
-        String token = (String) data.get("token");
+        // C-1 fix: JWT is in Set-Cookie header, not response body
+        String setCookie = loginResp.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+        assertThat(setCookie).isNotBlank().contains("caa_token=");
+        String token = setCookie.split("caa_token=")[1].split(";")[0];
         assertThat(token).isNotBlank();
 
         // Logout

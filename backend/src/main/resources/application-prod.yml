@@ -15,3 +15,31 @@ server:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/plain
     min-response-size: 1024
+
+# H-2 fix: 生产环境禁用 Swagger/OpenAPI
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# H-5 fix: 生产环境 actuator 仅保留 health，隐藏详情
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+# H-6 fix: 生产环境 Redis 必须通过环境变量注入密码
+spring:
+  data:
+    redis:
+      password: ${REDIS_PASSWORD}
+
+# H-4 fix: 生产环境默认密码必须通过环境变量覆盖
+app:
+  account:
+    default-password: ${APP_ACCOUNT_DEFAULT_PASSWORD}

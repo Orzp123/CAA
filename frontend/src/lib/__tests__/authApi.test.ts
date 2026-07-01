@@ -27,7 +27,7 @@ describe("login", () => {
   };
 
   const resp: LoginResponse = {
-    token:       "eyJ.test.token",
+    token:       null,
     expiresAt:   "2099-01-01T00:00:00Z",
     accountId:   "acc-1",
     nickname:    "张三",
@@ -36,10 +36,10 @@ describe("login", () => {
     tenantName:  "测试学校",
   };
 
-  it("成功登录返回 LoginResponse", async () => {
+  it("成功登录返回 LoginResponse（token 为 null，JWT 在 cookie 中）", async () => {
     mock.onPost("/api/auth/login").reply(200, resp);
     const result = await login(req);
-    expect(result.token).toBe(resp.token);
+    expect(result.token).toBeNull();
     expect(result.accountId).toBe(resp.accountId);
     expect(result.accountType).toBe("STUDENT");
   });
@@ -60,12 +60,12 @@ describe("login", () => {
 describe("logout", () => {
   it("成功登出不抛出异常", async () => {
     mock.onPost("/api/auth/logout").reply(200);
-    await expect(logout("eyJ.test.token")).resolves.toBeUndefined();
+    await expect(logout()).resolves.toBeUndefined();
   });
 
   it("服务端错误时抛出异常", async () => {
     mock.onPost("/api/auth/logout").reply(500);
-    await expect(logout("eyJ.test.token")).rejects.toThrow();
+    await expect(logout()).rejects.toThrow();
   });
 });
 

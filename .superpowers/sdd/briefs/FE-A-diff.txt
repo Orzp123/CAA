@@ -1,0 +1,864 @@
+ frontend/src/components/school/SchoolForm.tsx | 559 ++++++++++++++++++++++++++
+ frontend/src/lib/schoolApi.ts                 | 290 +++++++++++++
+ 2 files changed, 849 insertions(+)
+diff --git a/frontend/src/components/school/SchoolForm.tsx b/frontend/src/components/school/SchoolForm.tsx
+new file mode 100644
+index 0000000..ba90bb0
+--- /dev/null
++++ b/frontend/src/components/school/SchoolForm.tsx
+@@ -0,0 +1,559 @@
++"use client";
++
++import { useState, useEffect, useRef } from "react";
++import { useRouter } from "next/navigation";
++import {
++  schoolApi,
++  benefitPackageApi,
++  type SchoolCreateRequest,
++  type SchoolUpdateRequest,
++  type SchoolDetail,
++  type BenefitPackage,
++  type PromotionalSlot,
++  type SlotPosition,
++} from "@/lib/schoolApi";
++
++interface Props {
++  /** 传入时为编辑模式，不传时为新建模式 */
++  schoolId?: string;
++}
++
++type FormValues = {
++  name: string;
++  code: string;
++  domain: string;
++  packageId: string;
++  permissionCodes: string[];
++  systemNameZh: string;
++  systemNameEn: string;
++  description: string;
++  logoUrl: string;
++};
++
++const EMPTY: FormValues = {
++  name: "",
++  code: "",
++  domain: "",
++  packageId: "",
++  permissionCodes: [],
++  systemNameZh: "",
++  systemNameEn: "",
++  description: "",
++  logoUrl: "",
++};
++
++const SLOT_POSITIONS: { value: SlotPosition; label: string }[] = [
++  { value: "HOME_TOP_BANNER", label: "首页顶部横幅" },
++  { value: "HOME_SIDEBAR", label: "首页侧边栏" },
++  { value: "LOGIN_BANNER", label: "登录页横幅" },
++];
++
++const EMPTY_SLOT: Omit<PromotionalSlot, "sortOrder"> = {
++  title: "",
++  imageUrl: "",
++  linkUrl: "",
++  position: "HOME_TOP_BANNER",
++};
++
++const MAX_SLOTS = 10;
++
++export default function SchoolForm({ schoolId }: Props) {
++  const router = useRouter();
++  const isEdit = !!schoolId;
++  const fileInputRef = useRef<HTMLInputElement>(null);
++
++  const [values, setValues] = useState<FormValues>(EMPTY);
++  const [packages, setPackages] = useState<BenefitPackage[]>([]);
++  const [slots, setSlots] = useState<Omit<PromotionalSlot, "sortOrder">[]>([]);
++  const [loading, setLoading] = useState(false);
++  const [saving, setSaving] = useState(false);
++  const [logoUploading, setLogoUploading] = useState(false);
++  const [logoFileName, setLogoFileName] = useState<string>("");
++  const [error, setError] = useState<string | null>(null);
++
++  // 加载套餐列表（+ 编辑时加载学校详情）
++  useEffect(() => {
++    setLoading(true);
++    const tasks: Promise<unknown>[] = [benefitPackageApi.list()];
++    if (isEdit && schoolId) tasks.push(schoolApi.get(schoolId));
++
++    Promise.all(tasks)
++      .then(([pkgs, detail]) => {
++        setPackages(pkgs as BenefitPackage[]);
++        if (detail) {
++          const d = detail as SchoolDetail;
++          setValues({
++            name: d.name,
++            code: d.code,
++            domain: d.domain ?? "",
++            packageId: d.packageId ?? "",
++            permissionCodes: d.permissionCodes,
++            systemNameZh: d.brand.systemNameZh,
++            systemNameEn: d.brand.systemNameEn,
++            description: d.brand.description ?? "",
++            logoUrl: "",
++          });
++          // 回填运营位（去掉 sortOrder，由索引重新生成）
++          setSlots(
++            d.slots.map(({ title, imageUrl, linkUrl, position }) => ({
++              title,
++              imageUrl,
++              linkUrl,
++              position,
++            }))
++          );
++        }
++      })
++      .catch(() => setError("加载数据失败，请刷新重试。"))
++      .finally(() => setLoading(false));
++  }, [isEdit, schoolId]);
++
++  function set<K extends keyof FormValues>(key: K, val: FormValues[K]) {
++    setValues((prev) => ({ ...prev, [key]: val }));
++  }
++
++  function togglePermCode(code: string) {
++    setValues((prev) => ({
++      ...prev,
++      permissionCodes: prev.permissionCodes.includes(code)
++        ? prev.permissionCodes.filter((c) => c !== code)
++        : [...prev.permissionCodes, code],
++    }));
++  }
++
++  // 选择套餐时自动勾选该套餐的默认权限
++  function handlePackageChange(pkgId: string) {
++    const pkg = packages.find((p) => p.id === pkgId);
++    setValues((prev) => ({
++      ...prev,
++      packageId: pkgId,
++      permissionCodes: pkg ? pkg.defaultPermissionCodes : prev.permissionCodes,
++    }));
++  }
++
++  // Logo 上传：选文件后立即 PUT 直传 MinIO
++  async function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
++    const file = e.target.files?.[0];
++    if (!file || !schoolId) return;
++
++    setLogoUploading(true);
++    setError(null);
++    try {
++      const { uploadUrl, logoPath } = await schoolApi.getLogoUploadUrl(schoolId);
++      const resp = await fetch(uploadUrl, { method: "PUT", body: file });
++      if (!resp.ok) throw new Error(`上传失败：HTTP ${resp.status}`);
++      set("logoUrl", logoPath);
++      setLogoFileName(file.name);
++    } catch (err: unknown) {
++      const msg = err instanceof Error ? err.message : "Logo 上传失败，请重试。";
++      setError(msg);
++    } finally {
++      setLogoUploading(false);
++      // 重置 input 以允许重复选择同一文件
++      if (fileInputRef.current) fileInputRef.current.value = "";
++    }
++  }
++
++  // ── 运营位操作 ────────────────────────────────────────────────────────────────
++
++  function addSlot() {
++    if (slots.length >= MAX_SLOTS) return;
++    setSlots((prev) => [...prev, { ...EMPTY_SLOT }]);
++  }
++
++  function removeSlot(index: number) {
++    setSlots((prev) => prev.filter((_, i) => i !== index));
++  }
++
++  function updateSlot<K extends keyof Omit<PromotionalSlot, "sortOrder">>(
++    index: number,
++    key: K,
++    val: Omit<PromotionalSlot, "sortOrder">[K]
++  ) {
++    setSlots((prev) =>
++      prev.map((s, i) => (i === index ? { ...s, [key]: val } : s))
++    );
++  }
++
++  // 将 slots 转为含 sortOrder 的完整数组（1-based）
++  function buildSlots(): PromotionalSlot[] {
++    return slots.map((s, i) => ({ ...s, sortOrder: i + 1 }));
++  }
++
++  async function handleSubmit(e: React.FormEvent) {
++    e.preventDefault();
++    if (!values.name.trim()) { setError("学校名称不能为空"); return; }
++    if (!isEdit && !values.code.trim()) { setError("学校代码不能为空"); return; }
++    if (!values.packageId) { setError("请选择权益套餐"); return; }
++
++    setSaving(true);
++    setError(null);
++    try {
++      const brand = {
++        systemNameZh: values.systemNameZh,
++        systemNameEn: values.systemNameEn,
++        description: values.description || null,
++        ...(values.logoUrl ? { logoUrl: values.logoUrl } : {}),
++      };
++
++      if (isEdit && schoolId) {
++        const req: SchoolUpdateRequest = {
++          name: values.name,
++          domain: values.domain,
++          packageId: values.packageId,
++          permissionCodes: values.permissionCodes,
++          brand,
++          slots: buildSlots(),
++        };
++        await schoolApi.update(schoolId, req);
++      } else {
++        const req: SchoolCreateRequest = {
++          name: values.name,
++          code: values.code,
++          domain: values.domain,
++          packageId: values.packageId,
++          permissionCodes: values.permissionCodes,
++          brand,
++          slots: buildSlots(),
++        };
++        await schoolApi.create(req);
++      }
++      router.push("/admin/schools");
++    } catch (err: unknown) {
++      const msg =
++        (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
++      setError(msg ?? (isEdit ? "更新失败，请稍后重试。" : "创建失败，请检查代码是否重复。"));
++    } finally {
++      setSaving(false);
++    }
++  }
++
++  if (loading) {
++    return <p className="p-6 text-sm text-gray-400">加载中…</p>;
++  }
++
++  // 当前套餐的默认权限 codes（用于显示复选框）
++  const selectedPkg = packages.find((p) => p.id === values.packageId);
++  const availableCodes = selectedPkg?.defaultPermissionCodes ?? [];
++
++  return (
++    <form onSubmit={handleSubmit} noValidate className="max-w-2xl space-y-6">
++      {error && (
++        <div role="alert" className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
++          {error}
++        </div>
++      )}
++
++      {/* 基本信息 */}
++      <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-4">
++        <h2 className="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-2">基本信息</h2>
++
++        <div>
++          <label htmlFor="school-name" className="block text-sm font-medium text-gray-700 mb-1">
++            学校名称 <span className="text-red-500">*</span>
++          </label>
++          <input
++            id="school-name"
++            type="text"
++            value={values.name}
++            onChange={(e) => set("name", e.target.value)}
++            required
++            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
++          />
++        </div>
++
++        <div>
++          <label htmlFor="school-code" className="block text-sm font-medium text-gray-700 mb-1">
++            学校代码 {!isEdit && <span className="text-red-500">*</span>}
++          </label>
++          <input
++            id="school-code"
++            type="text"
++            value={values.code}
++            onChange={(e) => set("code", e.target.value.toUpperCase())}
++            disabled={isEdit}
++            required={!isEdit}
++            placeholder="例：PKU（创建后不可修改）"
++            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400"
++          />
++        </div>
++
++        <div>
++          <label htmlFor="school-domain" className="block text-sm font-medium text-gray-700 mb-1">
++            域名
++          </label>
++          <input
++            id="school-domain"
++            type="text"
++            value={values.domain}
++            onChange={(e) => set("domain", e.target.value)}
++            placeholder="例：pku.edu.cn"
++            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
++          />
++        </div>
++      </section>
++
++      {/* 品牌信息 */}
++      <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-4">
++        <h2 className="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-2">品牌信息</h2>
++
++        {/* Logo 上传（仅编辑模式） */}
++        {isEdit && (
++          <div>
++            <p className="block text-sm font-medium text-gray-700 mb-1">Logo</p>
++            <div className="flex items-center gap-3">
++              <label
++                htmlFor="logo-upload"
++                className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
++              >
++                {logoUploading ? "上传中…" : "选择图片"}
++              </label>
++              <input
++                ref={fileInputRef}
++                id="logo-upload"
++                type="file"
++                accept="image/*"
++                disabled={logoUploading}
++                onChange={handleLogoFileChange}
++                className="sr-only"
++              />
++              {logoFileName && !logoUploading && (
++                <span className="text-sm text-green-600 truncate max-w-xs" title={logoFileName}>
++                  ✓ {logoFileName}
++                </span>
++              )}
++              {logoUploading && (
++                <span className="text-sm text-gray-400">上传中…</span>
++              )}
++            </div>
++            <p className="mt-1 text-xs text-gray-400">支持 JPG、PNG、SVG，建议尺寸 200×60px</p>
++          </div>
++        )}
++
++        <div>
++          <label htmlFor="system-name-zh" className="block text-sm font-medium text-gray-700 mb-1">
++            系统名称（中文）
++          </label>
++          <input
++            id="system-name-zh"
++            type="text"
++            value={values.systemNameZh}
++            onChange={(e) => set("systemNameZh", e.target.value)}
++            placeholder="例：北京大学教学平台"
++            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
++          />
++        </div>
++
++        <div>
++          <label htmlFor="system-name-en" className="block text-sm font-medium text-gray-700 mb-1">
++            系统名称（英文）
++          </label>
++          <input
++            id="system-name-en"
++            type="text"
++            value={values.systemNameEn}
++            onChange={(e) => set("systemNameEn", e.target.value)}
++            placeholder="例：PKU Teaching Platform"
++            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
++          />
++        </div>
++
++        <div>
++          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
++            简介
++          </label>
++          <textarea
++            id="description"
++            value={values.description}
++            onChange={(e) => set("description", e.target.value)}
++            rows={3}
++            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
++          />
++        </div>
++      </section>
++
++      {/* 权益套餐 & 权限 */}
++      <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-4">
++        <h2 className="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-2">权益套餐</h2>
++
++        <div>
++          <label htmlFor="package-select" className="block text-sm font-medium text-gray-700 mb-1">
++            套餐 <span className="text-red-500">*</span>
++          </label>
++          <select
++            id="package-select"
++            value={values.packageId}
++            onChange={(e) => handlePackageChange(e.target.value)}
++            required
++            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
++          >
++            <option value="">请选择套餐</option>
++            {packages.map((pkg) => (
++              <option key={pkg.id} value={pkg.id}>
++                {pkg.name}
++              </option>
++            ))}
++          </select>
++        </div>
++
++        {availableCodes.length > 0 && (
++          <fieldset>
++            <legend className="text-sm font-medium text-gray-700 mb-2">权限（可在套餐默认基础上调整）</legend>
++            <div className="space-y-2">
++              {availableCodes.map((code) => (
++                <label key={code} className="flex items-center gap-2 cursor-pointer">
++                  <input
++                    type="checkbox"
++                    checked={values.permissionCodes.includes(code)}
++                    onChange={() => togglePermCode(code)}
++                    className="h-4 w-4 rounded border-gray-300 text-indigo-600"
++                  />
++                  <span className="text-sm text-gray-700 font-mono">{code}</span>
++                </label>
++              ))}
++            </div>
++          </fieldset>
++        )}
++      </section>
++
++      {/* 运营位管理 */}
++      <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-4">
++        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
++          <h2 className="text-sm font-semibold text-gray-700">
++            运营位
++            <span className="ml-2 text-xs font-normal text-gray-400">
++              {slots.length}/{MAX_SLOTS}
++            </span>
++          </h2>
++          <button
++            type="button"
++            onClick={addSlot}
++            disabled={slots.length >= MAX_SLOTS}
++            className="text-sm px-3 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
++          >
++            + 添加运营位
++          </button>
++        </div>
++
++        {slots.length === 0 && (
++          <p className="text-sm text-gray-400 text-center py-4">暂无运营位，点击右上角添加</p>
++        )}
++
++        <div className="space-y-4">
++          {slots.map((slot, index) => (
++            <div
++              key={index}
++              className="rounded-md border border-gray-200 bg-gray-50 p-4 space-y-3"
++            >
++              <div className="flex items-center justify-between">
++                <span className="text-xs font-semibold text-gray-500">运营位 #{index + 1}</span>
++                <button
++                  type="button"
++                  onClick={() => removeSlot(index)}
++                  className="text-xs text-red-500 hover:text-red-700 transition-colors"
++                  aria-label={`删除运营位 ${index + 1}`}
++                >
++                  删除
++                </button>
++              </div>
++
++              <div className="grid grid-cols-2 gap-3">
++                <div>
++                  <label
++                    htmlFor={`slot-title-${index}`}
++                    className="block text-xs font-medium text-gray-600 mb-1"
++                  >
++                    标题
++                  </label>
++                  <input
++                    id={`slot-title-${index}`}
++                    type="text"
++                    value={slot.title}
++                    onChange={(e) => updateSlot(index, "title", e.target.value)}
++                    placeholder="运营位标题"
++                    className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
++                  />
++                </div>
++
++                <div>
++                  <label
++                    htmlFor={`slot-position-${index}`}
++                    className="block text-xs font-medium text-gray-600 mb-1"
++                  >
++                    展示位置
++                  </label>
++                  <select
++                    id={`slot-position-${index}`}
++                    value={slot.position}
++                    onChange={(e) =>
++                      updateSlot(index, "position", e.target.value as SlotPosition)
++                    }
++                    className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
++                  >
++                    {SLOT_POSITIONS.map((pos) => (
++                      <option key={pos.value} value={pos.value}>
++                        {pos.label}
++                      </option>
++                    ))}
++                  </select>
++                </div>
++
++                <div>
++                  <label
++                    htmlFor={`slot-image-${index}`}
++                    className="block text-xs font-medium text-gray-600 mb-1"
++                  >
++                    图片 URL
++                  </label>
++                  <input
++                    id={`slot-image-${index}`}
++                    type="url"
++                    value={slot.imageUrl}
++                    onChange={(e) => updateSlot(index, "imageUrl", e.target.value)}
++                    placeholder="https://..."
++                    className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
++                  />
++                </div>
++
++                <div>
++                  <label
++                    htmlFor={`slot-link-${index}`}
++                    className="block text-xs font-medium text-gray-600 mb-1"
++                  >
++                    链接 URL
++                  </label>
++                  <input
++                    id={`slot-link-${index}`}
++                    type="url"
++                    value={slot.linkUrl}
++                    onChange={(e) => updateSlot(index, "linkUrl", e.target.value)}
++                    placeholder="https://..."
++                    className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
++                  />
++                </div>
++              </div>
++            </div>
++          ))}
++        </div>
++      </section>
++
++      {/* 操作按钮 */}
++      <div className="flex gap-3">
++        <button
++          type="submit"
++          disabled={saving}
++          className="px-5 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
++        >
++          {saving ? "保存中…" : isEdit ? "保存修改" : "创建学校"}
++        </button>
++        <button
++          type="button"
++          onClick={() => router.push("/admin/schools")}
++          className="px-5 py-2 rounded-md border border-gray-300 text-gray-600 text-sm hover:bg-gray-100 transition-colors"
++        >
++          取消
++        </button>
++      </div>
++    </form>
++  );
++}
+diff --git a/frontend/src/lib/schoolApi.ts b/frontend/src/lib/schoolApi.ts
+new file mode 100644
+index 0000000..2f4bca0
+--- /dev/null
++++ b/frontend/src/lib/schoolApi.ts
+@@ -0,0 +1,290 @@
++import { createAuthenticatedClient } from "./httpClient";
++
++// ── Authenticated HTTP client ─────────────────────────────────────────────────
++
++const schoolHttp = createAuthenticatedClient();
++
++// ── Types ─────────────────────────────────────────────────────────────────────
++
++export type SchoolStatus = "ACTIVE" | "INACTIVE";
++export type AccountStatus = "ACTIVE" | "DISABLED";
++export type AccountType = "SCHOOL_ADMIN" | "TEACHER" | "STUDENT";
++export type SecondaryRole = "TEACHER" | "ASSISTANT";
++export type SlotPosition = "HOME_TOP_BANNER" | "HOME_SIDEBAR" | "LOGIN_BANNER";
++
++export interface SchoolBrand {
++  logoUrl?: string | null;
++  systemNameZh: string;
++  systemNameEn: string;
++  description: string | null;
++}
++
++export interface PromotionalSlot {
++  title: string;
++  imageUrl: string;
++  linkUrl: string;
++  position: SlotPosition;
++  sortOrder: number;
++}
++
++/** 列表行（轻量） */
++export interface SchoolRow {
++  id: string;
++  code: string;
++  name: string;
++  domain?: string;
++  status: SchoolStatus;
++  adminCount: number;
++  createdAt: string;
++}
++
++/** 详情（含品牌、套餐、权限、运营位） */
++export interface SchoolDetail extends SchoolRow {
++  brand: SchoolBrand;
++  packageId: string | null;
++  permissionCodes: string[];
++  slots: PromotionalSlot[];
++}
++
++export interface SchoolCreateRequest {
++  name: string;
++  code: string;
++  domain: string;
++  packageId: string;
++  permissionCodes: string[];
++  brand: SchoolBrand;
++  slots: PromotionalSlot[];
++}
++
++export interface SchoolCreateResponse {
++  schoolId: string;
++  code: string;
++  name: string;
++  defaultAdminLoginName: string;
++  status: SchoolStatus;
++  createdAt: string;
++}
++
++export interface SchoolUpdateRequest {
++  name: string;
++  domain: string;
++  packageId: string;
++  permissionCodes: string[];
++  brand: SchoolBrand;
++  slots: PromotionalSlot[];
++}
++
++export interface PageResult<T> {
++  content: T[];
++  totalElements: number;
++  totalPages: number;
++  page: number;
++  size: number;
++}
++
++export interface SchoolListParams {
++  page: number;
++  size: number;
++  name?: string;
++  code?: string;
++}
++
++export interface LogoUploadUrlResponse {
++  uploadUrl: string;
++  logoPath: string;
++  expiresIn: number;
++}
++
++export interface AccountRow {
++  id: string;
++  loginName: string;
++  name: string;
++  nickname: string | null;
++  email: string | null;
++  phone: string | null;
++  accountType: AccountType;
++  secondaryRole: SecondaryRole | null;
++  status: AccountStatus;
++  createdAt: string;
++}
++
++export interface AccountCreateRequest {
++  loginName: string;
++  name: string;
++  accountType: AccountType;
++  secondaryRole: SecondaryRole | null;
++  nickname: string | null;
++  email: string | null;
++  phone: string | null;
++  password: string | null;
++}
++
++export interface AccountUpdateRequest {
++  name: string;
++  nickname: string | null;
++  email: string | null;
++  phone: string | null;
++}
++
++export interface AccountListParams {
++  page: number;
++  size: number;
++  loginName?: string;
++  accountType?: AccountType;
++  name?: string;
++}
++
++export interface BatchImportResult {
++  total: number;
++  successCount: number;
++  failureCount: number;
++  reportDownloadUrl: string;
++}
++
++export interface BatchRemoveResult {
++  deletedCount: number;
++  excludedSelfCount: number;
++}
++
++export interface BenefitPackage {
++  id: string;
++  name: string;
++  defaultPermissionCodes: string[];
++}
++
++// ── schoolApi ─────────────────────────────────────────────────────────────────
++
++export const schoolApi = {
++  /** GET /v1/schools — 学校列表（分页+搜索） */
++  list: (params: SchoolListParams): Promise<PageResult<SchoolRow>> => {
++    const query: Record<string, unknown> = { page: params.page, size: params.size };
++    if (params.name) query.name = params.name;
++    if (params.code) query.code = params.code;
++    return schoolHttp
++      .get<{ data: PageResult<SchoolRow> }>("/v1/schools", { params: query })
++      .then((r) => r.data.data);
++  },
++
++  /** GET /v1/schools/:id — 学校详情 */
++  get: (id: string): Promise<SchoolDetail> =>
++    schoolHttp
++      .get<{ data: SchoolDetail }>(`/v1/schools/${id}`)
++      .then((r) => r.data.data),
++
++  /** POST /v1/schools — 新建学校 */
++  create: (req: SchoolCreateRequest): Promise<SchoolCreateResponse> =>
++    schoolHttp
++      .post<{ data: SchoolCreateResponse }>("/v1/schools", req)
++      .then((r) => r.data.data),
++
++  /** PUT /v1/schools/:id — 更新学校 */
++  update: (id: string, req: SchoolUpdateRequest): Promise<SchoolDetail> =>
++    schoolHttp
++      .put<{ data: SchoolDetail }>(`/v1/schools/${id}`, req)
++      .then((r) => r.data.data),
++
++  /** PATCH /v1/schools/:id/status — 停用/启用学校 */
++  patchStatus: (id: string, status: SchoolStatus): Promise<{ id: string; status: SchoolStatus }> =>
++    schoolHttp
++      .patch<{ data: { id: string; status: SchoolStatus } }>(`/v1/schools/${id}/status`, { status })
++      .then((r) => r.data.data),
++
++  /** GET /v1/schools/:id/logo-upload-url — 获取 Logo 预签名上传 URL */
++  getLogoUploadUrl: (id: string): Promise<LogoUploadUrlResponse> =>
++    schoolHttp
++      .get<{ data: LogoUploadUrlResponse }>(`/v1/schools/${id}/logo-upload-url`)
++      .then((r) => r.data.data),
++};
++
++// ── accountApi ────────────────────────────────────────────────────────────────
++
++export const accountApi = {
++  /** GET /v1/schools/:schoolId/accounts — 账户列表 */
++  list: (schoolId: string, params: AccountListParams): Promise<PageResult<AccountRow>> => {
++    const query: Record<string, unknown> = { page: params.page, size: params.size };
++    if (params.loginName) query.loginName = params.loginName;
++    if (params.accountType) query.accountType = params.accountType;
++    if (params.name) query.name = params.name;
++    return schoolHttp
++      .get<{ data: PageResult<AccountRow> }>(`/v1/schools/${schoolId}/accounts`, { params: query })
++      .then((r) => r.data.data);
++  },
++
++  /** POST /v1/schools/:schoolId/accounts — 创建账户 */
++  create: (schoolId: string, req: AccountCreateRequest): Promise<AccountRow> =>
++    schoolHttp
++      .post<{ data: AccountRow }>(`/v1/schools/${schoolId}/accounts`, req)
++      .then((r) => r.data.data),
++
++  /** PUT /v1/schools/:schoolId/accounts/:accountId — 编辑账户 */
++  update: (schoolId: string, accountId: string, req: AccountUpdateRequest): Promise<AccountRow> =>
++    schoolHttp
++      .put<{ data: AccountRow }>(`/v1/schools/${schoolId}/accounts/${accountId}`, req)
++      .then((r) => r.data.data),
++
++  /** PATCH /v1/schools/:schoolId/accounts/:accountId/password — 重置密码 */
++  resetPassword: (schoolId: string, accountId: string, password: string | null): Promise<void> =>
++    schoolHttp
++      .patch(`/v1/schools/${schoolId}/accounts/${accountId}/password`, { password })
++      .then(() => undefined),
++
++  /** PATCH /v1/schools/:schoolId/accounts/:accountId/status — 启用/停用账户 */
++  patchStatus: (
++    schoolId: string,
++    accountId: string,
++    status: AccountStatus
++  ): Promise<{ id: string; status: AccountStatus }> =>
++    schoolHttp
++      .patch<{ data: { id: string; status: AccountStatus } }>(
++        `/v1/schools/${schoolId}/accounts/${accountId}/status`,
++        { status }
++      )
++      .then((r) => r.data.data),
++
++  /** DELETE /v1/schools/:schoolId/accounts/:accountId — 删除单个账户 */
++  remove: (schoolId: string, accountId: string): Promise<void> =>
++    schoolHttp
++      .delete(`/v1/schools/${schoolId}/accounts/${accountId}`)
++      .then(() => undefined),
++
++  /** POST /v1/schools/:schoolId/accounts/batch-import — 批量导入 */
++  batchImport: (schoolId: string, file: File): Promise<BatchImportResult> => {
++    const form = new FormData();
++    form.append("file", file);
++    return schoolHttp
++      .post<{ data: BatchImportResult }>(
++        `/v1/schools/${schoolId}/accounts/batch-import`,
++        form,
++        { headers: { "Content-Type": "multipart/form-data" } }
++      )
++      .then((r) => r.data.data);
++  },
++
++  /** PATCH /v1/schools/:schoolId/accounts/batch-status — 批量修改状态 */
++  batchPatchStatus: (
++    schoolId: string,
++    accountIds: string[],
++    status: AccountStatus
++  ): Promise<void> =>
++    schoolHttp
++      .patch(`/v1/schools/${schoolId}/accounts/batch-status`, { accountIds, status })
++      .then(() => undefined),
++
++  /** DELETE /v1/schools/:schoolId/accounts/batch — 批量删除 */
++  batchRemove: (schoolId: string, accountIds: string[]): Promise<BatchRemoveResult> =>
++    schoolHttp
++      .delete<{ data: BatchRemoveResult }>(`/v1/schools/${schoolId}/accounts/batch`, {
++        data: { accountIds },
++      })
++      .then((r) => r.data.data),
++};
++
++// ── benefitPackageApi ─────────────────────────────────────────────────────────
++
++export const benefitPackageApi = {
++  /** GET /v1/benefit-packages — 获取可用套餐列表 */
++  list: (): Promise<BenefitPackage[]> =>
++    schoolHttp
++      .get<{ data: BenefitPackage[] }>("/v1/benefit-packages")
++      .then((r) => r.data.data),
++};

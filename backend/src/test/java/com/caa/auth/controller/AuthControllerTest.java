@@ -36,6 +36,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = AuthController.class)
 @Import({GlobalExceptionHandler.class, JacksonAutoConfiguration.class})
+@org.springframework.test.context.ActiveProfiles("test")
+@org.springframework.test.context.TestPropertySource(properties = {
+    "spring.cloud.nacos.config.enabled=false",
+    "spring.cloud.nacos.discovery.enabled=false",
+    "spring.config.import=",
+    "spring.cloud.nacos.config.import-check.enabled=false"
+})
 class AuthControllerTest {
 
     @Autowired MockMvc mockMvc;
@@ -45,6 +52,7 @@ class AuthControllerTest {
     @MockitoBean CaptchaService      captchaService;
     @MockitoBean TenantService       tenantService;
     @MockitoBean WechatOAuth2Service wechatOAuth2Service;
+    @MockitoBean com.caa.auth.service.TokenService tokenService;
 
     // ── fixtures ────────────────────────────────────────────────────────────
 
@@ -76,7 +84,7 @@ class AuthControllerTest {
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.token").value(TOKEN))
+                .andExpect(cookie().exists("caa_token"))
                 .andExpect(jsonPath("$.data.accountId").value(ACCOUNT_ID));
     }
 
@@ -167,6 +175,13 @@ class AuthControllerTest {
     @Test
     @DisplayName("POST /auth/logout — 200 with null data")
     void logout_success() throws Exception {
+        org.springframework.security.oauth2.jwt.Jwt jwt =
+                org.springframework.security.oauth2.jwt.Jwt.withTokenValue(TOKEN)
+                        .header("alg", "HS256")
+                        .claim("sub", ACCOUNT_ID)
+                        .build();
+        when(tokenService.parse(TOKEN)).thenReturn(jwt);
+
         mockMvc.perform(post("/auth/logout")
                         .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
